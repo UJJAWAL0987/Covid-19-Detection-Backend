@@ -1,0 +1,6 @@
+Flask
+Pillow
+opencv-python
+numpy
+tensorflow
+gunicorn # For production deployment
