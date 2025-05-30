@@ -10,7 +10,8 @@ import io
 from flask_cors import CORS
 
 app = Flask(__name__, static_folder='static', template_folder='static')
-CORS(app) # This enables CORS for all routes
+CORS(app, resources={"r/predict": {"origins": "https://covid-19-detection-frontend.netlify.app/"}}) # <--- ADD/MODIFY THIS LINE
+ # This enables CORS for all routes
 # Or for specific routes: CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 
