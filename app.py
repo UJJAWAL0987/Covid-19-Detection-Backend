@@ -6,13 +6,42 @@ import numpy as np
 import cv2
 from PIL import Image
 import io
-
 from flask_cors import CORS
+
+# For MongoDB
+from pymongo import MongoClient
+# For local .env file management (remove in production if using platform env vars)
+from dotenv import load_dotenv
+
+# Load environment variables from .env file for local development
+# In production (Fly.io/Render), these will be set directly as secrets/env vars
+load_dotenv()
 
 app = Flask(__name__, static_folder='static', template_folder='static')
 
-# CORRECTED CORS CONFIGURATION
-CORS(app, resources={"r/predict": {"origins": ["https://covid-19-detection-frontend.netlify.app"]}})
+# CORRECTED CORS CONFIGURATION (use your Netlify URL)
+CORS(app, resources={r"/predict": {"origins": ["https://covid-19-detection-frontend.netlify.app"]}})
+
+# --- MongoDB Configuration ---
+# Get MongoDB URI from environment variable
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME = "covid_detection_db" # Name your database
+COLLECTION_NAME = "predictions" # Name your collection
+
+# Initialize MongoDB client
+mongo_client = None
+if MONGO_URI:
+    try:
+        mongo_client = MongoClient(MONGO_URI)
+        db = mongo_client[DB_NAME]
+        predictions_collection = db[COLLECTION_NAME]
+        print(f"[INFO] MongoDB connected to database: {DB_NAME}")
+    except Exception as e:
+        print(f"[ERROR] Could not connect to MongoDB: {e}")
+        mongo_client = None # Set to None if connection fails
+else:
+    print("[WARNING] MONGO_URI environment variable not set. MongoDB will not be used.")
+
 
 # --- Configuration ---
 MODEL_PATH = 'model/covid_pypower.h5'
@@ -42,40 +71,40 @@ def predict():
 
     if file:
         try:
-            # Read the image file from the request
             in_memory_file = io.BytesIO()
             file.save(in_memory_file)
             in_memory_file.seek(0)
 
-            # Use PIL to open the image (more robust than cv2.imread for streams)
-            pil_image = Image.open(in_memory_file).convert('RGB') # Ensure it's RGB
-            frame = np.array(pil_image) # Convert PIL Image to NumPy array (OpenCV format)
+            pil_image = Image.open(in_memory_file).convert('RGB')
+            frame = np.array(pil_image)
 
-            # Ensure the image is in BGR for OpenCV if needed, though PIL to RGB is usually fine
-            # If your model expects BGR, uncomment below. Keras models often expect RGB.
-            # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-            # Preprocessing (similar to your original code)
-            # Assuming your model expects RGB input for 224x224x3
-            # If your model was trained on grayscale, you might need to adjust.
-            # The current approach converts to grayscale then back to RGB; review your model's training data for consistency.
-            # If your model expects RGB directly, you can simply resize `pil_image` and convert to array.
-            roi_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # This line implies frame is BGR initially, which it might not be from PIL. If issues, check this.
+            roi_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             roi_gray = cv2.resize(roi_gray, IMAGE_SIZE)
-            roi_rgb = cv2.cvtColor(roi_gray, cv2.COLOR_GRAY2RGB) # Convert grayscale to RGB
+            roi_rgb = cv2.cvtColor(roi_gray, cv2.COLOR_GRAY2RGB)
 
-            # Normalize & Expand dimensions
             roi = roi_rgb.astype('float') / 255.0
             roi = img_to_array(roi)
-            roi = np.expand_dims(roi, axis=0) # Final shape: (1, 224, 224, 3)
+            roi = np.expand_dims(roi, axis=0)
 
-            # Classify the image
             print("[INFO] Classifying image...")
             preds = model.predict(roi)[0]
             label = LABELS[preds.argmax()]
             confidence = float(preds[preds.argmax()])
 
             print(f"[INFO] Prediction: {label} (Confidence: {confidence:.2f})")
+
+            # --- Store prediction in MongoDB ---
+            if mongo_client:
+                try:
+                    prediction_data = {
+                        "prediction": label,
+                        "confidence": confidence,
+                        "timestamp": datetime.now() # Requires `from datetime import datetime` at top
+                    }
+                    predictions_collection.insert_one(prediction_data)
+                    print("[INFO] Prediction stored in MongoDB.")
+                except Exception as e:
+                    print(f"[ERROR] Failed to store prediction in MongoDB: {e}")
 
             return jsonify({'prediction': label, 'confidence': confidence})
 
@@ -89,13 +118,9 @@ def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    # Ensure the model directory exists
     if not os.path.exists('model'):
         os.makedirs('model')
-    # Ensure the static directory exists (for web assets)
     if not os.path.exists('static'):
         os.makedirs('static')
 
-    # For development, run with debug=True
-    # For production, use a WSGI server like Gunicorn
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -5,3 +5,5 @@ opencv-python-headless # Use this for cv2 on servers without a display
 Pillow
 Flask-CORS           # <--- ADD THIS LINE
 gunicorn             # If you're using Gunicorn to serve your app
+pymongo # <--- ADD THIS LINE
+python-dotenv # <--- ADD THIS LINE (for local development .env file)
