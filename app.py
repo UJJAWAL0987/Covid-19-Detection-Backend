@@ -12,7 +12,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='static', template_folder='static')
 
 # CORRECTED CORS CONFIGURATION
-CORS(app, resources={r"/predict": {"origins": ["https://covid-19-detection-frontend.netlify.app"]}})
+CORS(app, resources={"r/predict": {"origins": ["https://covid-19-detection-frontend.netlify.app"]}})
 
 # --- Configuration ---
 MODEL_PATH = 'model/covid_pypower.h5'
