@@ -10,19 +10,16 @@ import io
 from flask_cors import CORS
 
 app = Flask(__name__, static_folder='static', template_folder='static')
-CORS(app, resources={"r/predict": {"origins": "https://covid-19-detection-frontend.netlify.app/"}}) # <--- ADD/MODIFY THIS LINE
- # This enables CORS for all routes
-# Or for specific routes: CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+# CORRECTED CORS CONFIGURATION
+CORS(app, resources={r"/predict": {"origins": ["https://covid-19-detection-frontend.netlify.app"]}})
 
 # --- Configuration ---
-# Set the path where your model is located relative to app.py
 MODEL_PATH = 'model/covid_pypower.h5'
 LABELS = ['Covid', 'Normal']
 IMAGE_SIZE = (224, 224) # Model input size
 
 # --- Load the model once when the app starts ---
-# This is crucial for performance; don't load the model on every request
 try:
     model = load_model(MODEL_PATH)
     print(f"[INFO] Model loaded successfully from {MODEL_PATH}")
@@ -59,7 +56,11 @@ def predict():
             # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             # Preprocessing (similar to your original code)
-            roi_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Assuming your model expects RGB input for 224x224x3
+            # If your model was trained on grayscale, you might need to adjust.
+            # The current approach converts to grayscale then back to RGB; review your model's training data for consistency.
+            # If your model expects RGB directly, you can simply resize `pil_image` and convert to array.
+            roi_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # This line implies frame is BGR initially, which it might not be from PIL. If issues, check this.
             roi_gray = cv2.resize(roi_gray, IMAGE_SIZE)
             roi_rgb = cv2.cvtColor(roi_gray, cv2.COLOR_GRAY2RGB) # Convert grayscale to RGB
 
