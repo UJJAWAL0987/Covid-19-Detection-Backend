@@ -9,13 +9,22 @@ import io
 
 from flask_cors import CORS
 
-app = Flask(__name__, static_folder='static', template_folder='static')
+app = Flask(__name__)
+
+from dotenv import load_dotenv # Import to load environment variables
+
+# Load environment variables from .env file (important for production)
+load_dotenv()
 
 # CORRECTED CORS CONFIGURATION
-CORS(app, resources={r"/predict": {"origins": ["https://covid-19-detection-frontend.netlify.app"]}})
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "https://covid-19-detection-frontend.netlify.app")
+CORS(app, resources={r'/predict': {"origins": [FRONTEND_ORIGIN]}})
+
 
 # --- Configuration ---
-MODEL_PATH = 'model/covid_pypower.h5'
+# MODEL_PATH needs to be relative to the app.py file when deployed.
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'model', 'covid_pypower.h5')
+LABELS = ['Covid', 'Normal']
 LABELS = ['Covid', 'Normal']
 IMAGE_SIZE = (224, 224) # Model input size
 
